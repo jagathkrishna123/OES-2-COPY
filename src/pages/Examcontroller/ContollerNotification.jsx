@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { TEACHERSDATA } from '../../constants/constants'
+import React, { useState, useEffect, useRef } from 'react'
 import { FaBell, FaUser, FaUsers, FaPaperPlane, FaCheckCircle } from 'react-icons/fa'
 
 const ContollerNotification = () => {
@@ -10,6 +9,9 @@ const ContollerNotification = () => {
   const [priority, setPriority] = useState('normal') // 'low', 'normal', 'high'
   const [loading, setLoading] = useState(false)
   const [notifications, setNotifications] = useState([])
+  const [activeTeachers, setActiveTeachers] = useState([])
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
 
   // Load existing notifications
   useEffect(() => {
@@ -17,7 +19,25 @@ const ContollerNotification = () => {
     setNotifications(savedNotifications)
   }, [])
 
-  const activeTeachers = TEACHERSDATA.filter(teacher => teacher.status === 'active')
+  // Load teachers from localStorage
+  useEffect(() => {
+    const savedTeachers = JSON.parse(localStorage.getItem('teachers')) || []
+    const filteredTeachers = savedTeachers.filter(teacher => teacher.status === 'active')
+    setActiveTeachers(filteredTeachers)
+    console.log('Active Teachers:', filteredTeachers)
+  }, [])
+
+  // Handle clicks outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleTeacherSelect = (teacherId) => {
     setSelectedTeachers(prev =>
@@ -31,8 +51,17 @@ const ContollerNotification = () => {
     if (selectedTeachers.length === activeTeachers.length) {
       setSelectedTeachers([])
     } else {
-      setSelectedTeachers(activeTeachers.map(teacher => teacher.id))
+      setSelectedTeachers(activeTeachers.map(teacher => teacher.teacherId))
     }
+  }
+
+  const getSelectedTeachersText = () => {
+    if (selectedTeachers.length === 0) return 'Select teachers...'
+    if (selectedTeachers.length === 1) {
+      const teacher = activeTeachers.find(t => t.teacherId === selectedTeachers[0])
+      return teacher ? `${teacher.name} (${teacher.department})` : 'Select teachers...'
+    }
+    return `${selectedTeachers.length} teachers selected`
   }
 
   const sendNotification = async () => {
@@ -70,18 +99,18 @@ const ContollerNotification = () => {
       if (notificationType === 'all') {
         // Send to all active teachers
         activeTeachers.forEach(teacher => {
-          const teacherNotifications = JSON.parse(localStorage.getItem(`teacherNotifications_${teacher.id}`)) || []
+          const teacherNotifications = JSON.parse(localStorage.getItem(`teacherNotifications_${teacher.teacherId}`)) || []
           teacherNotifications.unshift({
             ...newNotification,
-            recipientId: teacher.id,
+            recipientId: teacher.teacherId,
             recipientName: teacher.name
           })
-          localStorage.setItem(`teacherNotifications_${teacher.id}`, JSON.stringify(teacherNotifications))
+          localStorage.setItem(`teacherNotifications_${teacher.teacherId}`, JSON.stringify(teacherNotifications))
         })
       } else {
         // Send to specific teachers
         selectedTeachers.forEach(teacherId => {
-          const teacher = activeTeachers.find(t => t.id === teacherId)
+          const teacher = activeTeachers.find(t => t.teacherId === teacherId)
           if (teacher) {
             const teacherNotifications = JSON.parse(localStorage.getItem(`teacherNotifications_${teacherId}`)) || []
             teacherNotifications.unshift({
@@ -182,38 +211,68 @@ const ContollerNotification = () => {
                 </div>
               </div>
 
-              {/* Teacher Selection */}
+              {/* Teacher Selection Dropdown */}
               {notificationType === 'specific' && (
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Select Teachers:
-                    </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Teachers:
+                  </label>
+                  <div className="relative" ref={dropdownRef}>
                     <button
-                      onClick={handleSelectAll}
-                      className="text-sm text-blue-600 hover:text-blue-800"
+                      type="button"
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-left flex items-center justify-between"
                     >
-                      {selectedTeachers.length === activeTeachers.length ? 'Deselect All' : 'Select All'}
+                      <span className={selectedTeachers.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                        {getSelectedTeachersText()}
+                      </span>
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </button>
+
+                    {isDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <div className="p-2">
+                          <button
+                            type="button"
+                            onClick={handleSelectAll}
+                            className="w-full text-left px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+                          >
+                            {selectedTeachers.length === activeTeachers.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                          <div className="border-t border-gray-200 my-2"></div>
+                          {activeTeachers.length === 0 ? (
+                            <p className="text-sm text-gray-500 p-2">No teachers available</p>
+                          ) : (
+                            activeTeachers.map(teacher => (
+                              <label key={teacher.teacherId} className="flex items-center px-2 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTeachers.includes(teacher.teacherId)}
+                                  onChange={() => handleTeacherSelect(teacher.teacherId)}
+                                  className="mr-3"
+                                />
+                                <span className="text-sm text-gray-700">
+                                  {teacher.name} ({teacher.department})
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-                    {activeTeachers.map(teacher => (
-                      <label key={teacher.id} className="flex items-center py-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedTeachers.includes(teacher.id)}
-                          onChange={() => handleTeacherSelect(teacher.id)}
-                          className="mr-3"
-                        />
-                        <span className="text-sm text-gray-700">
-                          {teacher.name} ({teacher.department})
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Selected: {selectedTeachers.length} teacher(s)
-                  </p>
+                  {selectedTeachers.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {selectedTeachers.length} teacher{selectedTeachers.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
                 </div>
               )}
 

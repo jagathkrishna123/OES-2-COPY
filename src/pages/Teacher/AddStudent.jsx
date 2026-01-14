@@ -26,6 +26,7 @@ const AddStudent = () => {
       setFormData((prev) => ({
         ...prev,
         teacherId: storedTeacher.id,
+        department: storedTeacher.department || "",
       }));
     }
 
@@ -36,6 +37,12 @@ const AddStudent = () => {
         const parsedDepartments = JSON.parse(savedDepartments);
         if (Array.isArray(parsedDepartments)) {
           setDepartments(parsedDepartments);
+
+          // If teacher has a department, set available years
+          if (storedTeacher && storedTeacher.department) {
+            const dept = parsedDepartments.find((d) => d.name === storedTeacher.department);
+            setAvailableYears(dept ? Object.keys(dept.years) : []);
+          }
         } else {
           setDepartments([]);
         }
@@ -124,12 +131,18 @@ const AddStudent = () => {
     setFormData({
       studentName: "",
       studentRoll: "",
-      department: "",
+      department: teacher.department || "",
       year: "",
       teacherId: teacher.id,
     });
 
-    setAvailableYears([]);
+    // Reset available years based on teacher's department
+    if (teacher.department) {
+      const dept = departments.find((d) => d.name === teacher.department);
+      setAvailableYears(dept ? Object.keys(dept.years) : []);
+    } else {
+      setAvailableYears([]);
+    }
   };
 
   return (

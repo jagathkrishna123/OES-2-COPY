@@ -39,9 +39,9 @@ const ControllerSidebar = () => {
             <CgNotes/>
             <p className='hidden md:inline-block'>Manage Result</p>
         </NavLink>
-        <NavLink  to='/controller/reports' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-800"}`}>
+        <NavLink  to='/controller/allstudents' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-800"}`}>
             <GoReport/>
-            <p className='hidden md:inline-block'>report&Status</p>
+            <p className='hidden md:inline-block'>All Students</p>
         </NavLink>
     </div>
   )

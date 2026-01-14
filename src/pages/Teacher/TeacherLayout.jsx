@@ -35,9 +35,9 @@ const TeacherLayout = () => {
             <div className='flex gap-3 items-center'>
              <p className="text-md font-medium text-gray-700">
                Welcome, {teacherName}
-               {teacher?.subject && (
+               {(teacher?.subject || teacher?.department) && (
                  <span className="text-sm text-gray-500 ml-2">
-                   ({teacher.subject})
+                   ({teacher?.subject}{teacher?.subject && teacher?.department ? ' - ' : ''}{teacher?.department})
                  </span>
                )}
              </p>

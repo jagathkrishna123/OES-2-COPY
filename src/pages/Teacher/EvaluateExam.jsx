@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { getAllExams } from "../../constants/constants";
+import { getDynamicExams } from "../../constants/constants";
 import { useNavigate } from "react-router-dom";
 import { FaBook, FaClock, FaCheckCircle, FaUsers, FaFileAlt } from "react-icons/fa";
 
 const EvaluateExam = () => {
   const navigate = useNavigate();
   const [examData, setExamData] = useState([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const loadData = () => {
-      setExamData(getAllExams());
+      const newData = getDynamicExams();
+      setExamData(newData);
     };
 
     loadData();
 
     // Reload data periodically to catch newly created exams
-    const interval = setInterval(loadData, 1000);
+    const interval = setInterval(() => {
+      loadData();
+      setRefreshTrigger(prev => prev + 1); // Force re-render
+    }, 1000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -34,7 +40,16 @@ const EvaluateExam = () => {
 
       {/* Exams Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {examData.map((exam) => {
+        {examData.length === 0 ? (
+          <div className="col-span-full text-center py-12">
+            <div className="text-gray-500">
+              <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">No Exams Available</h3>
+              <p>Please create exams from the Exam Controller section.</p>
+            </div>
+          </div>
+        ) : (
+          examData.map((exam) => {
           const totalStudents = exam.students.length;
           const evaluatedStudents = exam.students.filter(s => s.status === "evaluated").length;
           const pendingStudents = totalStudents - evaluatedStudents;
@@ -106,7 +121,7 @@ const EvaluateExam = () => {
               <button
                 onClick={() => {
                   // Force reload of exam data before navigation
-                  const freshData = getAllExams();
+                  const freshData = getDynamicExams();
                   console.log("EvaluateExam - navigating to exam:", exam.id, "with fresh data:", freshData.length, "exams");
                   navigate(`/teacher/evaluation/${exam.id}`);
                 }}
@@ -130,7 +145,7 @@ const EvaluateExam = () => {
               </button>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {/* Summary Stats */}

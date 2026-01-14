@@ -9,18 +9,18 @@ import { NavLink } from 'react-router-dom'
 
 const TeacherSidebar = () => {
   return (
-    <div className='flex flex-col border-r border-gray-200 min-h-full pt-6 text-gray-400 font-out'>
-        <NavLink end={true} to='/teacher' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 border-r-4 border-primary"}`}>
+    <div className='flex flex-col border-r border-gray-200 min-h-full pt-6 text-gray-700 font-out'>
+        <NavLink end={true} to='/teacher' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-500 font-semibold"}`}>
             <RxDashboard />
             <p className='hidden md:inline-block'>Dashboard</p>
         </NavLink>
 
-        <NavLink  to='/teacher/addstudent' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 border-r-4 border-primary"}`}>
+        <NavLink  to='/teacher/addstudent' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-500 font-semibold"}`}>
             <CgAdd/>
             <p className='hidden md:inline-block'>Add Student</p>
         </NavLink>
 
-        <NavLink  to='/teacher/managestudents' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 border-r-4 border-primary"}`}>
+        <NavLink  to='/teacher/managestudents' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-500 font-semibold"}`}>
             <FaUsers/>
             <p className='hidden md:inline-block'>Manage Students</p>
         </NavLink>
@@ -30,12 +30,12 @@ const TeacherSidebar = () => {
             <p className='hidden md:inline-block'>Add Subject</p>
         </NavLink> */}
 
-        <NavLink  to='/teacher/evaluate' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 border-r-4 border-primary"}`}>
+        <NavLink  to='/teacher/evaluate' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-500 font-semibold"}`}>
             <PiExam/>
             <p className='hidden md:inline-block'>Evaluate Exam</p>
         </NavLink>
 
-        <NavLink  to='/teacher/notification' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 border-r-4 border-primary"}`}>
+        <NavLink  to='/teacher/notification' className={({isActive})=> `flex items-center gap-3 py-3.5 px-3 md:px-9 md:min-w-64 cursor-pointer ${isActive && "bg-cyan-800 text-white border-r-4 border-blue-500 font-semibold"}`}>
             <BiNotification/>
             <p className='hidden md:inline-block'>Notifications</p>
         </NavLink>

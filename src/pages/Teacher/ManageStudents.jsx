@@ -6,7 +6,7 @@ const ManageStudents = () => {
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [sortOrder, setSortOrder] = useState("asc");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
   const [editingStudent, setEditingStudent] = useState(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
@@ -21,7 +21,7 @@ const ManageStudents = () => {
 
   const [availableYears, setAvailableYears] = useState([]);
 
-  // Load teacher info, students, and departments
+  // Load teacher info and departments
   useEffect(() => {
     try {
       const storedTeacher = localStorage.getItem("teacher");
@@ -52,20 +52,28 @@ const ManageStudents = () => {
       console.error("Error loading departments:", error);
       setDepartments([]);
     }
-
-    // Load students (both dummy and added)
-    loadStudents();
   }, []);
 
+  // Load students when teacher data is available
+  useEffect(() => {
+    if (teacher.department) {
+      loadStudents();
+    }
+  }, [teacher.department]);
+
   const loadStudents = () => {
-    // Load only added students from localStorage
+    // Load only added students from localStorage and filter by teacher's department
     try {
       const savedStudents = localStorage.getItem("addedStudents");
       if (savedStudents) {
         const addedStudents = JSON.parse(savedStudents);
         if (Array.isArray(addedStudents)) {
-          setStudents(addedStudents);
-          setFilteredStudents(addedStudents);
+          // Filter students by teacher's department
+          const teacherDepartmentStudents = addedStudents.filter(
+            student => student.department === teacher.department
+          );
+          setStudents(teacherDepartmentStudents);
+          setFilteredStudents(teacherDepartmentStudents);
         } else {
           setStudents([]);
           setFilteredStudents([]);
@@ -81,7 +89,7 @@ const ManageStudents = () => {
     }
   };
 
-  // Filter students by department
+  // Filter students by year
   useEffect(() => {
     if (students.length === 0) {
       setFilteredStudents([]);
@@ -90,24 +98,24 @@ const ManageStudents = () => {
 
     let filtered = [...students];
 
-    if (selectedDepartment) {
-      filtered = filtered.filter(student => student.department === selectedDepartment);
+    if (selectedYear) {
+      filtered = filtered.filter(student => student.year === selectedYear);
     }
 
-    // Sort by department
+    // Sort by name
     filtered.sort((a, b) => {
-      const deptA = a.department.toLowerCase();
-      const deptB = b.department.toLowerCase();
+      const nameA = a.studentName.toLowerCase();
+      const nameB = b.studentName.toLowerCase();
 
       if (sortOrder === "asc") {
-        return deptA.localeCompare(deptB);
+        return nameA.localeCompare(nameB);
       } else {
-        return deptB.localeCompare(deptA);
+        return nameB.localeCompare(nameA);
       }
     });
 
     setFilteredStudents(filtered);
-  }, [students, selectedDepartment, sortOrder]);
+  }, [students, selectedYear, sortOrder]);
 
   // Handle department change for editing
   const handleDepartmentChange = (e) => {
@@ -288,23 +296,23 @@ const ManageStudents = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <FaFilter className="text-purple-500" />
-                  Filter by Department
+                  Filter by Year
                 </label>
                 <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
-                  <option value="">All Departments</option>
-                  {departments.length > 0 ? (
-                    departments.map((dept) => (
-                      <option key={dept.id} value={dept.name}>
-                        {dept.name}
+                  <option value="">All Years</option>
+                  {(() => {
+                    // Get unique years from students
+                    const uniqueYears = [...new Set(students.map(student => student.year))].sort();
+                    return uniqueYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
                       </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>No departments available</option>
-                  )}
+                    ));
+                  })()}
                 </select>
               </div>
 
@@ -314,7 +322,7 @@ const ManageStudents = () => {
                   className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:from-blue-700 hover:to-cyan-600 focus:ring-2 focus:ring-blue-500 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
                 >
                   <FaSort />
-                  Sort by Department ({sortOrder === "asc" ? "A-Z" : "Z-A"})
+                  Sort by Name ({sortOrder === "asc" ? "A-Z" : "Z-A"})
                 </button>
               </div>
             </div>
@@ -324,7 +332,7 @@ const ManageStudents = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
-                Added Students ({filteredStudents.length} {selectedDepartment && `filtered by ${selectedDepartment}`})
+                Students in {teacher.department} ({filteredStudents.length} {selectedYear && `filtered by ${selectedYear}`})
               </h3>
             </div>
 
@@ -347,10 +355,7 @@ const ManageStudents = () => {
                       <FaUsers className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">No Students Found</h3>
                       <p className="text-gray-600">
-                        {selectedDepartment
-                          ? `No students found in ${selectedDepartment} department.`
-                          : "No students have been added yet. Use the 'Add Student' form to add students."
-                        }
+                        No students have been added yet in your department. Use the 'Add Student' form to add students.
                       </p>
                     </td>
                   </tr>

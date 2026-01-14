@@ -449,17 +449,35 @@ export const EXAMDATA = [
 ];
 
 
-// Global variable to store dynamically created exams
-export let DYNAMIC_EXAMDATA = [];
-
 // Function to add new exam
 export const addNewExam = (exam) => {
-  DYNAMIC_EXAMDATA.push(exam);
+  const existing = JSON.parse(localStorage.getItem("dynamicExams") || "[]");
+  const updated = [...existing, exam];
+  localStorage.setItem("dynamicExams", JSON.stringify(updated));
+};
+
+// Function to get dynamic exams (returns fresh copy)
+export const getDynamicExams = () => {
+  const exams = JSON.parse(localStorage.getItem("dynamicExams") || "[]");
+  return exams;
 };
 
 // Function to get all exams (static + dynamic)
 export const getAllExams = () => {
-  return [...EXAMDATA, ...DYNAMIC_EXAMDATA];
+  return [...EXAMDATA, ..._dynamicExamData];
+};
+
+// For backwards compatibility
+export const DYNAMIC_EXAMDATA = {
+  get value() {
+    return getDynamicExams();
+  },
+  push(exam) {
+    addNewExam(exam);
+  },
+  get length() {
+    return getDynamicExams().length;
+  }
 };
 
 

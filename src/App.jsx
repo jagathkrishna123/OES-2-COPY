@@ -18,10 +18,10 @@ import ManageTeacher from "./pages/Examcontroller/ManageTeacher";
 import AddDepartment from "./pages/Examcontroller/AddDepartment";
 import ContollerNotification from "./pages/Examcontroller/ContollerNotification";
 import ManageResults from "./pages/Examcontroller/ManageResults";
-import ViewReportAndStatus from "./pages/Examcontroller/ViewReportAndStatus";
 import SubjectEvaluation from "./pages/Teacher/SubjectEvaluation";
 import StudentEvaluation from "./pages/Teacher/StudentEvaluation";
 import ScrollToTop from "./components/ScrollToTop";
+import AllStudents from "./pages/Examcontroller/AllStudents";
 const App = () => {
   const { pathname } = useLocation();
   const hideLayout = pathname.includes("admin") || pathname.includes("teacher") || pathname.includes("controller");
@@ -62,7 +62,7 @@ const App = () => {
             element={<ContollerNotification />}
           />
           <Route path="resultsmanage-" element={<ManageResults />} />
-          <Route path="reports" element={<ViewReportAndStatus />} />
+          <Route path="allstudents" element={<AllStudents/>} />
         </Route>
       </Routes>
 

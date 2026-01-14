@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { EXAMDATA, addNewExam } from "../../constants/constants";
+import { addNewExam, getDynamicExams } from "../../constants/constants";
 import { FaPlus, FaTrash, FaUpload, FaFileAlt, FaBook, FaUsers, FaKey, FaRedo } from "react-icons/fa";
 
 const CreateExam = () => {
@@ -231,9 +231,10 @@ const CreateExam = () => {
     try {
       setLoading(true);
 
-      // For demo purposes, we'll simulate API success and add to local EXAMDATA
+      // For demo purposes, we'll simulate API success and add to local storage
       // In a real application, this would be handled by the backend
-      const newExamId = `EXAM${String(EXAMDATA.length + 1).padStart(3, '0')}`;
+      const existingExams = getDynamicExams();
+      const newExamId = `EXAM${String(existingExams.length + 1).padStart(3, '0')}`;
 
       const newExam = {
         id: newExamId,
