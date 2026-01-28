@@ -18,6 +18,10 @@ const StudentResults = () => {
   const [expandedExamId, setExpandedExamId] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [selectedYear, setSelectedYear] = useState("all");
+
+
   useEffect(() => {
     loadResults();
   }, []);
@@ -39,19 +43,19 @@ const StudentResults = () => {
 
       if (students.length) {
         const totalMarks =
-  exam.totalMarks ??
-  Math.max(...students.map(s => s.outOfMarks || s.marks));
+          exam.totalMarks ??
+          Math.max(...students.map(s => s.outOfMarks || s.marks));
 
 
-results.push({
-  examId: exam.id,
-  examTitle: exam.title,
-  department: exam.department,
-  subject: exam.subject,
-  year: exam.year,
-  totalMarks,
-  students,
-});
+        results.push({
+          examId: exam.id,
+          examTitle: exam.title,
+          department: exam.department,
+          subject: exam.subject,
+          year: exam.year,
+          totalMarks,
+          students,
+        });
 
       }
     });
@@ -59,6 +63,29 @@ results.push({
     setGroupedResults(results);
     setLoading(false);
   };
+
+  const departments = [
+    "all",
+    ...new Set(groupedResults.map((e) => e.department)),
+  ];
+
+  const years = [
+    "all",
+    ...new Set(groupedResults.map((e) => e.year)),
+  ];
+
+
+  //filter logic
+  const filteredResults = groupedResults.filter((exam) => {
+    const deptMatch =
+      selectedDepartment === "all" ||
+      exam.department === selectedDepartment;
+
+    const yearMatch =
+      selectedYear === "all" || exam.year === selectedYear;
+
+    return deptMatch && yearMatch;
+  });
 
   const toggleExpand = (id) => {
     setExpandedExamId(expandedExamId === id ? null : id);
@@ -71,15 +98,15 @@ results.push({
     if (percentage >= 50) return "bg-yellow-100 text-yellow-700";
     return "bg-red-100 text-red-700";
   };
-  
+
 
 
 
   const getGradeFromPercentage = (marks, total) => {
     if (!total || total === 0) return "N/A";
-  
+
     const percentage = (marks / total) * 100;
-  
+
     if (percentage >= 90) return "A+";
     if (percentage >= 80) return "A";
     if (percentage >= 70) return "B+";
@@ -87,9 +114,9 @@ results.push({
     if (percentage >= 50) return "C";
     return "F";
   };
-  
-  
-  
+
+
+
 
   if (loading) {
     return (
@@ -100,7 +127,7 @@ results.push({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6 pt-20">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6 pt-20 font-out">
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}
@@ -114,15 +141,88 @@ results.push({
         <h1 className="text-4xl font-bold text-center mb-10">
           📘 Exam Results
         </h1>
+        <div className="mb-10">
+  <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-md border border-gray-200 p-6">
+    <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+
+      {/* Title */}
+      <div className="flex items-center gap-3 text-blue-600">
+        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+          <FaChartBar />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Filter Results
+          </h2>
+          <p className="text-sm text-gray-500">
+            Narrow down by department & year
+          </p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+
+        {/* Department */}
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1">
+            Department
+          </label>
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="min-w-[180px] px-4 py-2 rounded-xl border border-gray-300 bg-gray-50
+                       focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                       transition"
+          >
+            {departments.map((dept, i) => (
+              <option key={i} value={dept}>
+                {dept === "all" ? "All Departments" : dept}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Year */}
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1">
+            Academic Year
+          </label>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="min-w-[150px] px-4 py-2 rounded-xl border border-gray-300 bg-gray-50
+                       focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                       transition"
+          >
+            {years.map((year, i) => (
+              <option key={i} value={year}>
+                {year === "all" ? "All Years" : year}
+              </option>
+            ))}
+          </select>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
 
         <div className="space-y-6">
-          {groupedResults.map((exam) => {
+          {filteredResults.length === 0 && (
+            <div className="text-center text-gray-500 mt-10">
+              No results found for selected filters
+            </div>
+          )}
+          {filteredResults.map((exam) => {
             const totalStudents = exam.students.length;
             // const avg =
             //   exam.students.reduce((a, s) => a + s.marks, 0) /
             //   totalStudents;
             const avg =
-  exam.students.reduce((a, s) => a + s.marks, 0) / totalStudents;
+              exam.students.reduce((a, s) => a + s.marks, 0) / totalStudents;
 
 
             return (
@@ -206,23 +306,23 @@ results.push({
                               <td className="p-3">{s.rollNo}</td>
                               <td className="p-3">{s.studentName}</td>
                               <td className="p-3 font-semibold">
-                              {s.marks}/{exam.totalMarks}
+                                {s.marks}/{exam.totalMarks}
                               </td>
                               <td className="p-3">
-                                
-                                {(() => {
-  const percentage = (s.marks / exam.totalMarks) * 100;
 
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-sm font-semibold ${gradeBadgeFromPercentage(
-        percentage
-      )}`}
-    >
-      {getGradeFromPercentage(s.marks, exam.totalMarks)}
-    </span>
-  );
-})()}
+                                {(() => {
+                                  const percentage = (s.marks / exam.totalMarks) * 100;
+
+                                  return (
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-sm font-semibold ${gradeBadgeFromPercentage(
+                                        percentage
+                                      )}`}
+                                    >
+                                      {getGradeFromPercentage(s.marks, exam.totalMarks)}
+                                    </span>
+                                  );
+                                })()}
 
                               </td>
                               <td className="p-3 text-sm text-gray-600">
