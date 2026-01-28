@@ -39,7 +39,9 @@ const StudentResults = () => {
 
       if (students.length) {
         const totalMarks =
-  (exam.questions?.length || 0) * (exam.marksPerQuestion || 0);
+  exam.totalMarks ??
+  Math.max(...students.map(s => s.outOfMarks || s.marks));
+
 
 results.push({
   examId: exam.id,

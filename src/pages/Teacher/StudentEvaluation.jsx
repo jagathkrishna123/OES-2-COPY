@@ -222,9 +222,17 @@ const StudentEvaluation = () => {
       // Update the student status to evaluated and save to localStorage
       const updatedExam = {
         ...exam,
+        totalMarks: totalPossibleMarks,
         students: exam.students.map(s =>
           s.studentId === studentId
-            ? { ...s, status: "evaluated", marks: totalMarks, evaluationDate: new Date().toISOString() }
+          ? {
+            ...s,
+            status: "evaluated",
+            marks: totalMarks,
+            outOfMarks: totalPossibleMarks, // ✅ ADD THIS
+            evaluationDate: new Date().toISOString()
+          }
+        
             : s
         )
       };
