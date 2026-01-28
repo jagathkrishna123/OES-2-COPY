@@ -38,14 +38,19 @@ const StudentResults = () => {
       );
 
       if (students.length) {
-        results.push({
-          examId: exam.id,
-          examTitle: exam.title,
-          department: exam.department,
-          subject: exam.subject,
-          year: exam.year,
-          students,
-        });
+        const totalMarks =
+  (exam.questions?.length || 0) * (exam.marksPerQuestion || 0);
+
+results.push({
+  examId: exam.id,
+  examTitle: exam.title,
+  department: exam.department,
+  subject: exam.subject,
+  year: exam.year,
+  totalMarks,
+  students,
+});
+
       }
     });
 
@@ -56,24 +61,33 @@ const StudentResults = () => {
   const toggleExpand = (id) => {
     setExpandedExamId(expandedExamId === id ? null : id);
   };
-
-  const gradeBadge = (marks) => {
-    if (marks >= 90) return "bg-green-100 text-green-700";
-    if (marks >= 80) return "bg-green-100 text-green-700";
-    if (marks >= 70) return "bg-blue-100 text-blue-700";
-    if (marks >= 60) return "bg-blue-100 text-blue-700";
-    if (marks >= 50) return "bg-yellow-100 text-yellow-700";
+  const gradeBadgeFromPercentage = (percentage) => {
+    if (percentage >= 90) return "bg-green-100 text-green-700";
+    if (percentage >= 80) return "bg-green-100 text-green-700";
+    if (percentage >= 70) return "bg-blue-100 text-blue-700";
+    if (percentage >= 60) return "bg-blue-100 text-blue-700";
+    if (percentage >= 50) return "bg-yellow-100 text-yellow-700";
     return "bg-red-100 text-red-700";
   };
+  
 
-  const gradeText = (marks) => {
-    if (marks >= 90) return "A+";
-    if (marks >= 80) return "A";
-    if (marks >= 70) return "B+";
-    if (marks >= 60) return "B";
-    if (marks >= 50) return "C";
+
+
+  const getGradeFromPercentage = (marks, total) => {
+    if (!total || total === 0) return "N/A";
+  
+    const percentage = (marks / total) * 100;
+  
+    if (percentage >= 90) return "A+";
+    if (percentage >= 80) return "A";
+    if (percentage >= 70) return "B+";
+    if (percentage >= 60) return "B";
+    if (percentage >= 50) return "C";
     return "F";
   };
+  
+  
+  
 
   if (loading) {
     return (
@@ -102,9 +116,12 @@ const StudentResults = () => {
         <div className="space-y-6">
           {groupedResults.map((exam) => {
             const totalStudents = exam.students.length;
+            // const avg =
+            //   exam.students.reduce((a, s) => a + s.marks, 0) /
+            //   totalStudents;
             const avg =
-              exam.students.reduce((a, s) => a + s.marks, 0) /
-              totalStudents;
+  exam.students.reduce((a, s) => a + s.marks, 0) / totalStudents;
+
 
             return (
               <div
@@ -155,7 +172,8 @@ const StudentResults = () => {
                       />
                       <StatCard
                         label="Average Marks"
-                        value={avg.toFixed(1)}
+                        value={`${Math.max(...exam.students.map(s => s.marks))} / ${exam.totalMarks}`}
+
                       />
                       <StatCard
                         label="Highest"
@@ -186,16 +204,24 @@ const StudentResults = () => {
                               <td className="p-3">{s.rollNo}</td>
                               <td className="p-3">{s.studentName}</td>
                               <td className="p-3 font-semibold">
-                                {s.marks}/100
+                              {s.marks}/{exam.totalMarks}
                               </td>
                               <td className="p-3">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-sm font-semibold ${gradeBadge(
-                                    s.marks
-                                  )}`}
-                                >
-                                  {gradeText(s.marks)}
-                                </span>
+                                
+                                {(() => {
+  const percentage = (s.marks / exam.totalMarks) * 100;
+
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-semibold ${gradeBadgeFromPercentage(
+        percentage
+      )}`}
+    >
+      {getGradeFromPercentage(s.marks, exam.totalMarks)}
+    </span>
+  );
+})()}
+
                               </td>
                               <td className="p-3 text-sm text-gray-600">
                                 {new Date(
