@@ -350,121 +350,52 @@ export const TEACHERSDATA = [
 ];
 
 
-export const EXAMDATA = [
-  {
-    id: "EXAM001",
-    title: "Data Structures Mid-term Examination 2024",
-    department: "CSE",
-    year: "2nd Year",
-    subject: "Data Structures",
-    questionPaper: "ds_midterm_2024.pdf",
-    answerKey: "ds_midterm_answers_2024.pdf",
-    createdAt: "2024-10-15T10:30:00Z",
-    status: "completed",
-    students: [
-      {
-        studentId: "STD002",
-        studentName: "Meera Nair",
-        rollNo: "CSE205",
-        answerSheet: "meera_nair_answer.pdf",
-        submittedAt: "2024-10-15T14:30:00Z",
-        status: "evaluated"
-      },
-      {
-        studentId: "STD008",
-        studentName: "Rohan Gupta",
-        rollNo: "CSE308",
-        answerSheet: "rohan_gupta_answer.pdf",
-        submittedAt: "2024-10-15T15:45:00Z",
-        status: "pending"
-      }
-    ]
-  },
-  {
-    id: "EXAM002",
-    title: "Digital Signal Processing Final Exam 2024",
-    department: "ECE",
-    year: "3rd Year",
-    subject: "Digital Signal Processing",
-    questionPaper: notes8,
-    answerKey: notes9,
-    createdAt: "2024-11-01T09:15:00Z",
-    status: "active",
-    students: [
-      {
-        studentId: "STD007",
-        studentName: "Sneha Patel",
-        rollNo: "ECE312",
-        answerSheet: "sneha_patel_answer.pdf",
-        submittedAt: "2024-11-01T11:20:00Z",
-        status: "evaluated"
-      },
-      {
-        studentId: "STD009",
-        studentName: "Amit Kumar",
-        rollNo: "ECE207",
-        answerSheet: "amit_kumar_answer.pdf",
-        submittedAt: "2024-11-01T12:10:00Z",
-        status: "evaluated"
-      },
-      {
-        studentId: "STD013",
-        studentName: "Kavya Menon",
-        rollNo: "ECE409",
-        answerSheet: notes10,
-        submittedAt: "2024-11-01T13:30:00Z",
-        status: "pending"
-      }
-    ]
-  },
-  {
-    id: "EXAM003",
-    title: "Thermodynamics Quiz Assessment",
-    department: "ME",
-    year: "2nd Year",
-    subject: "Thermodynamics",
-    questionPaper: "thermo_quiz_2024.pdf",
-    answerKey: "thermo_quiz_answers_2024.pdf",
-    createdAt: "2024-11-10T16:00:00Z",
-    status: "active",
-    students: [
-      {
-        studentId: "STD016",
-        studentName: "Vishal Singh",
-        rollNo: "ME201",
-        answerSheet: "vishal_singh_answer.pdf",
-        submittedAt: "2024-11-10T17:30:00Z",
-        status: "pending"
-      },
-      {
-        studentId: "STD020",
-        studentName: "Mohan Reddy",
-        rollNo: "ME267",
-        answerSheet: "mohan_reddy_answer.pdf",
-        submittedAt: "2024-11-10T18:15:00Z",
-        status: "pending"
-      }
-    ]
-  }
-];
 
+
+
+// Global storage for File objects (persists during session)
+const fileStorage = new Map();
+
+// Function to store a file
+export const storeFile = (key, file) => {
+  fileStorage.set(key, file);
+};
+
+// Function to get a stored file
+export const getStoredFile = (key) => {
+  return fileStorage.get(key);
+};
 
 // Function to add new exam
 export const addNewExam = (exam) => {
+  // Store exam data directly in localStorage (Base64 strings are serializable)
   const existing = JSON.parse(localStorage.getItem("dynamicExams") || "[]");
   const updated = [...existing, exam];
   localStorage.setItem("dynamicExams", JSON.stringify(updated));
 };
 
-// Function to get dynamic exams (returns fresh copy)
+// Function to get dynamic exams (returns exams with Base64 data)
 export const getDynamicExams = () => {
-  const exams = JSON.parse(localStorage.getItem("dynamicExams") || "[]");
-  return exams;
+  return JSON.parse(localStorage.getItem("dynamicExams") || "[]");
 };
 
-// Function to get all exams (static + dynamic)
+// Function to update an exam in localStorage
+export const updateExam = (updatedExam) => {
+  const existing = JSON.parse(localStorage.getItem("dynamicExams") || "[]");
+  const updated = existing.map(exam =>
+    exam.id === updatedExam.id ? {
+      ...updatedExam,
+      questionPaperFile: undefined,
+      answerKeyFile: undefined,
+      students: updatedExam.students.map(s => ({ ...s, answerSheetFile: undefined }))
+    } : exam
+  );
+  localStorage.setItem("dynamicExams", JSON.stringify(updated));
+};
+
+// Function to get all exams (for backwards compatibility)
 export const getAllExams = () => {
-  return [...EXAMDATA, ..._dynamicExamData];
+  return getDynamicExams();
 };
 
 // For backwards compatibility

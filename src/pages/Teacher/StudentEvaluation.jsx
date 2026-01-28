@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { getAllExams } from "../../constants/constants";
-import { FaFileAlt, FaKey, FaArrowLeft, FaSave, FaEye, FaCheckCircle, FaTimes, FaExpand, FaCompress } from "react-icons/fa";
+import { getDynamicExams, updateExam } from "../../constants/constants";
+import { FaFileAlt, FaKey, FaArrowLeft, FaSave, FaEye, FaTimes, FaExpand, FaCompress, FaCheckCircle } from "react-icons/fa";
+import { base64ToBlobUrl, revokeBlobUrls } from "../../utils/fileUtils";
 
 const StudentEvaluation = () => {
-  const { examId, studentId } = useParams();
+  const { subjectId, studentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,49 +20,93 @@ const StudentEvaluation = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [questionCount, setQuestionCount] = useState(10);
+  const [blobUrls, setBlobUrls] = useState({}); // Track blob URLs for cleanup
+
+  // Convert Base64 data to blob URLs
+  const createBlobUrls = (examData, studentData) => {
+    const urls = {};
+
+    // Question paper
+    if (examData.questionPaper) {
+      urls.questionPaper = base64ToBlobUrl(examData.questionPaper);
+    }
+
+    // Answer key
+    if (examData.answerKey) {
+      urls.answerKey = base64ToBlobUrl(examData.answerKey);
+    }
+
+    // Student answer sheet
+    if (studentData?.answerSheet) {
+      urls.answerSheet = base64ToBlobUrl(studentData.answerSheet);
+    }
+
+    setBlobUrls(urls);
+    return urls;
+  };
 
   // Load exam data on mount and when params change
   useEffect(() => {
-    const loadData = () => {
-      const allExams = getAllExams();
-      setExamData(allExams);
+    // Only load exam data if we don't have exam from navigation state
+    if (!location.state?.examData) {
+      const loadData = () => {
+        const allExams = getDynamicExams();
+        setExamData(allExams);
+        setDataLoaded(true);
+      };
+
+      loadData();
+
+      // Also load data after a delay to ensure any newly created exams are loaded
+      const timeoutId = setTimeout(() => {
+        const refreshedExams = getDynamicExams();
+        if (refreshedExams.length !== examData.length) {
+          setExamData(refreshedExams);
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    } else {
       setDataLoaded(true);
-    };
+    }
+  }, [subjectId, studentId, location.state?.examData]);
 
-    // Load data immediately
-    loadData();
-
-    // Also load data after a delay to ensure any newly created exams are loaded
-    const timeoutId = setTimeout(() => {
-      const refreshedExams = getAllExams();
-      if (refreshedExams.length !== examData.length) {
-        setExamData(refreshedExams);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [examId, studentId]);
-
-  // Get exam data from navigation state if available, otherwise from loaded data
+  // Get exam data from navigation state - this should always be available
   const examFromState = location.state?.examData;
-  const exam = examFromState || examData.find(e => e.id === examId);
-  const student = exam?.students?.find(s => s.studentId === studentId);
+  const exam = examFromState || examData.find(e => e.id === subjectId);
+
+  // If no exam from state, try to find it in loaded data
+  const studentFromState = location.state?.studentData;
+  const student = studentFromState || exam?.students?.find(s => s.studentId === studentId);
+
+  // Create blob URLs from Base64 data when exam and student are available
+  useEffect(() => {
+    if (exam && student && !Object.keys(blobUrls).length) {
+      createBlobUrls(exam, student);
+    }
+  }, [exam, student]);
+
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up blob URLs to prevent memory leaks
+      revokeBlobUrls(blobUrls.questionPaper, blobUrls.answerKey, blobUrls.answerSheet);
+    };
+  }, [blobUrls]);
 
   // If exam not found and data is loaded, try reloading data
   useEffect(() => {
     if (dataLoaded && !exam) {
-      console.log("Exam not found, reloading data...");
-      const refreshedData = getAllExams();
+      const refreshedData = getDynamicExams();
       setExamData(refreshedData);
 
-      const refreshedExam = refreshedData.find(e => e.id === examId);
+      const refreshedExam = refreshedData.find(e => e.id === subjectId);
       if (refreshedExam) {
-        console.log("Found exam after reload:", refreshedExam.id);
       } else {
-        console.log("Still no exam found after reload");
       }
     }
-  }, [dataLoaded, exam, examId]);
+  }, [dataLoaded, exam, subjectId]);
 
   // Loading state - show loading if no exam data available yet
   if (!dataLoaded && !exam) {
@@ -101,7 +146,7 @@ const StudentEvaluation = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Student Not Found</h2>
           <p className="text-gray-600">The requested student evaluation could not be found.</p>
           <button
-            onClick={() => navigate(`/teacher/evaluation/${examId}`)}
+            onClick={() => navigate(`/teacher/evaluation/${subjectId}`)}
             className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Back to Subject Evaluation
@@ -122,12 +167,11 @@ const StudentEvaluation = () => {
       }
       setMarks(initialMarks);
       setOutOfMarks(initialOutOfMarks);
-      calculateTotal();
     }
   }, [exam, student, questionCount]);
 
-  const calculateTotal = () => {
-    // Only calculate for current question count
+  // Calculate totals using useMemo for reactive computation
+  const { calculatedTotalMarks, calculatedTotalPossibleMarks } = useMemo(() => {
     let total = 0;
     let totalPossible = 0;
 
@@ -140,21 +184,26 @@ const StudentEvaluation = () => {
       totalPossible += outOfValue;
     }
 
-    console.log(`Calculated totals: ${total}/${totalPossible} for ${questionCount} questions`);
-    setTotalMarks(total);
-    setTotalPossibleMarks(totalPossible);
-  };
+    return {
+      calculatedTotalMarks: total,
+      calculatedTotalPossibleMarks: totalPossible
+    };
+  }, [marks, outOfMarks, questionCount]);
+
+  // Update total marks state when calculations change
+  useEffect(() => {
+    setTotalMarks(calculatedTotalMarks);
+    setTotalPossibleMarks(calculatedTotalPossibleMarks);
+  }, [calculatedTotalMarks, calculatedTotalPossibleMarks]);
 
   const handleMarkChange = (question, value) => {
     const newMarks = { ...marks, [question]: parseFloat(value) || 0 };
     setMarks(newMarks);
-    calculateTotal();
   };
 
   const handleOutOfMarksChange = (question, value) => {
     const newOutOfMarks = { ...outOfMarks, [question]: parseFloat(value) || 0 };
     setOutOfMarks(newOutOfMarks);
-    calculateTotal();
   };
 
   const handleSubmit = async () => {
@@ -170,7 +219,7 @@ const StudentEvaluation = () => {
       // For demo purposes, we'll just show a success message
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
 
-      // Update the student status to evaluated in EXAMDATA (in real app, this would be done via API)
+      // Update the student status to evaluated and save to localStorage
       const updatedExam = {
         ...exam,
         students: exam.students.map(s =>
@@ -180,19 +229,21 @@ const StudentEvaluation = () => {
         )
       };
 
-      // In a real application, you would update this via API
+      // Save the updated exam to localStorage
+      updateExam(updatedExam);
+
       console.log("Evaluation submitted:", {
-        examId,
+        subjectId,
         studentId,
         marks,
         totalMarks,
         comments
       });
 
-      alert(`Evaluation submitted successfully!\nTotal Marks: ${totalMarks}/${totalPossibleMarks}`);
+      alert(`Evaluation submitted successfully!\nTotal Marks: ${totalMarks}/${totalPossibleMarks}\n\nNote: Results will be published by the exam controller.`);
 
       // Navigate back to subject evaluation
-      navigate(`/teacher/evaluation/${examId}`);
+      navigate(`/teacher/evaluation/${subjectId}`);
 
     } catch (error) {
       alert("Failed to submit evaluation. Please try again.");
@@ -211,7 +262,14 @@ const StudentEvaluation = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate(`/teacher/evaluation/${examId}`)}
+                onClick={() => {
+                  if (subjectId) {
+                    navigate(`/teacher/evaluation/${subjectId}`);
+                  } else {
+                    // Fallback: try to navigate to teacher dashboard
+                    navigate("/teacher");
+                  }
+                }}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 text-[13px] md:text-[16px] hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <FaArrowLeft />
@@ -254,8 +312,7 @@ const StudentEvaluation = () => {
                   setMarks(newMarks);
                   setOutOfMarks(newOutOfMarks);
 
-                  // Calculate totals with the cleaned data
-                  calculateTotal();
+                  // Totals will be recalculated automatically by useEffect
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
@@ -267,14 +324,21 @@ const StudentEvaluation = () => {
           </div>
         </div>
 
-        <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+        
+
+        <div className={`grid gap-6 transition-all duration-500 ease-in-out ${isFullscreen ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
 
           {/* Left Panel - Question Paper & Answer Key */}
           {!isFullscreen && (
-            <div className="space-y-6">
+            <div className="space-y-6 transform transition-all duration-500 ease-in-out opacity-100 translate-x-0"
+                 style={{
+                   transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                   transform: isFullscreen ? 'translateX(-100%)' : 'translateX(0)',
+                   opacity: isFullscreen ? 0 : 1
+                 }}>
 
             {/* Tab Navigation */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out hover:shadow-md">
               <div className="flex border-b border-gray-200">
                 <button
                   onClick={() => setActiveTab("questionPaper")}
@@ -313,12 +377,33 @@ const StudentEvaluation = () => {
                       <h4 className="font-semibold text-gray-900 mb-4">{exam.subject} - Question Paper</h4>
 
                       <div className="w-full h-[500px] border border-gray-300 rounded-lg overflow-hidden">
-                        <iframe
-                          src={exam.questionPaper}
-                          className="w-full h-full"
-                          title={`${exam.subject} - Question Paper`}
-                          style={{ border: 'none' }}
-                        />
+                        {blobUrls.questionPaper ? (
+                          (exam.questionPaperType && exam.questionPaperType.includes('pdf')) ? (
+                            <iframe
+                              src={blobUrls.questionPaper}
+                              className="w-full h-full"
+                              title={`${exam.subject} - Question Paper`}
+                              style={{ border: 'none' }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                              <div className="text-center">
+                                <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                                <p>Question Paper uploaded</p>
+                                <p className="text-sm mt-2">Type: {exam.questionPaperType || 'Unknown'}</p>
+                                <p className="text-xs mt-1">Only PDF files can be displayed in browser</p>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                            <div className="text-center">
+                              <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                              <p>Question Paper: Not available</p>
+                              <p className="text-sm mt-2">File display not available</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="text-center text-gray-500 text-sm mt-4">
@@ -338,12 +423,33 @@ const StudentEvaluation = () => {
                       <h4 className="font-semibold text-gray-900 mb-4">Answer Key - {exam.subject}</h4>
 
                       <div className="w-full h-[500px] border rounded-lg overflow-hidden">
-                        <iframe
-                          src={exam.answerKey}
-                          className="w-full h-full"
-                          title={`${exam.subject} - Answer Key`}
-                          style={{ border: 'none' }}
-                        />
+                        {blobUrls.answerKey ? (
+                          (exam.answerKeyType && exam.answerKeyType.includes('pdf')) ? (
+                            <iframe
+                              src={blobUrls.answerKey}
+                              className="w-full h-full"
+                              title={`${exam.subject} - Answer Key`}
+                              style={{ border: 'none' }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-green-50 text-gray-500">
+                              <div className="text-center">
+                                <FaKey className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                                <p>Answer Key uploaded</p>
+                                <p className="text-sm mt-2">Type: {exam.answerKeyType || 'Unknown'}</p>
+                                <p className="text-xs mt-1">Only PDF files can be displayed in browser</p>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-green-50 text-gray-500">
+                            <div className="text-center">
+                              <FaKey className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                              <p>Answer Key: Not available</p>
+                              <p className="text-sm mt-2">File display not available</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="text-center text-gray-500 text-sm mt-4">
@@ -357,8 +463,13 @@ const StudentEvaluation = () => {
           </div>
           )}
 
-          {/* Right Panel - Student Answer Sheet & Marking */}
-          <div className="space-y-6">
+          {/* Right Panel - Student Answer Sheet */}
+          <div className="space-y-6 transform transition-all duration-500 ease-in-out"
+               style={{
+                 transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                 transform: isFullscreen ? 'translateX(0) scale(105%)' : 'translateX(0) scale(100%)',
+                 opacity: 1
+               }}>
 
             {/* Student Answer Sheet */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -366,15 +477,17 @@ const StudentEvaluation = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <FaEye className="text-purple-600 text-xl" />
-                    <h3 className="text-lg font-semibold text-gray-900">Student Answer Sheet</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Student Answer Sheetxx</h3>
                   </div>
                   <button
                     onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-300 ease-in-out hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
                     title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                   >
-                    {isFullscreen ? <FaCompress /> : <FaExpand />}
-                    <span className="text-sm font-medium">
+                    <span className={`transition-transform duration-300 ${isFullscreen ? 'rotate-180' : 'rotate-0'}`}>
+                      {isFullscreen ? <FaCompress /> : <FaExpand />}
+                    </span>
+                    <span className="text-sm font-medium transition-all duration-300">
                       {isFullscreen ? "Minimize" : "Fullscreen"}
                     </span>
                   </button>
@@ -383,62 +496,117 @@ const StudentEvaluation = () => {
 
               <div className="p-6">
                 {/* Student Answer Sheet PDF Display */}
-                <div className="mb-6 mt-10">
-                  <h4 className="font-semibold text-gray-900 mb-4">Student Answer Sheet</h4>
-                  <div className="w-full h-[500px] border rounded-lg overflow-hidden">
-                    <iframe
-                      src={student.answerSheet}
-                      className="w-full h-full"
-                      title={`${student.studentName} - Answer Sheet`}
-                      style={{ border: 'none' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Question-wise Marking */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900">Question-wise Evaluation</h4>
-                  {Array.from({ length: questionCount }, (_, i) => i + 1).map((q) => (
-                    <div key={q} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="font-medium text-gray-900">Question {q}</p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max={outOfMarks[`q${q}`] || 10}
-                            value={marks[`q${q}`] || 0}
-                            onChange={(e) => handleMarkChange(`q${q}`, e.target.value)}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm"
-                            placeholder="0"
-                          />
-                          <span className="text-sm text-gray-600">/</span>
-                          <select
-                            value={outOfMarks[`q${q}`] || 10}
-                            onChange={(e) => handleOutOfMarksChange(`q${q}`, e.target.value)}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm bg-white"
-                          >
-                            <option value={2}>2</option>
-                            <option value={5}>5</option>
-                            <option value={10}>10</option>
-                            <option value={15}>15</option>
-                            <option value={20}>20</option>
-                            <option value={25}>25</option>
-                          </select>
+                <div className="w-full h-[600px] border rounded-lg overflow-hidden mt-6">
+                  {blobUrls.answerSheet ? (
+                    (student.answerSheetType && student.answerSheetType.includes('pdf')) ? (
+                      <iframe
+                        src={blobUrls.answerSheet}
+                        className="w-full h-full"
+                        title={`${student.studentName} - Answer Sheet`}
+                        style={{ border: 'none' }}
+                      />
+                    ) : (student.answerSheetType && student.answerSheetType.includes('image')) ? (
+                      <div className="w-full h-full flex items-center justify-center bg-blue-50">
+                        <img
+                          src={blobUrls.answerSheet}
+                          alt={`${student.studentName} - Answer Sheet`}
+                          className="max-w-full max-h-full object-contain"
+                          style={{ width: 'auto', height: 'auto' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-blue-50 text-gray-500">
+                        <div className="text-center">
+                          <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                          <p>Answer Sheet uploaded</p>
+                          <p className="text-sm mt-2">Type: {student.answerSheetType || 'Unknown'}</p>
+                          <p className="text-xs mt-1">File type not supported for display</p>
                         </div>
                       </div>
-
-                      <div className="text-sm text-gray-600">
-                        <p>Mark the student's answer for Question {q}</p>
+                    )
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-blue-50 text-gray-500">
+                      <div className="text-center">
+                        <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                        <p>Answer Sheet: Not available</p>
+                        <p className="text-sm mt-2">File display not available</p>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Marking Summary & Comments */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            
+          </div>
+        </div>
+        {/* Question-wise Evaluation - Compact Design */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 transform transition-all duration-300 ease-in-out hover:shadow-md">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FaCheckCircle className="text-blue-600 text-lg" />
+              <h3 className="text-lg font-semibold text-gray-900">Question Evaluation</h3>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-bold text-blue-600">{totalMarks}/{totalPossibleMarks}</div>
+              <div className="text-xs text-gray-600">Total Score</div>
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {Array.from({ length: questionCount }, (_, i) => i + 1).map((q) => (
+              <div key={q} className="border border-gray-200 rounded-md p-3 hover:border-blue-300 hover:shadow-sm transition-all duration-200 ease-in-out hover:scale-[1.02] transform">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                      {q}
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">Q{q}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max={outOfMarks[`q${q}`] || 10}
+                      value={marks[`q${q}`] || 0}
+                      onChange={(e) => handleMarkChange(`q${q}`, e.target.value)}
+                      className="w-10 px-1 py-1 border border-gray-300 rounded text-center text-xs font-semibold focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                    <span className="text-gray-400 text-xs">/</span>
+                    <select
+                      value={outOfMarks[`q${q}`] || 10}
+                      onChange={(e) => handleOutOfMarksChange(`q${q}`, e.target.value)}
+                      className="w-12 px-1 py-1 border border-gray-300 rounded text-center text-xs bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={2}>2</option>
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                      <option value={25}>25</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
+                  <div
+                    className="bg-gradient-to-r from-blue-600 to-cyan-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${outOfMarks[`q${q}`] ? ((marks[`q${q}`] || 0) / outOfMarks[`q${q}`]) * 100 : 0}%`
+                    }}
+                  ></div>
+                </div>
+
+                <div className="text-xs text-gray-500 text-center">
+                  {(marks[`q${q}`] || 0)}/{outOfMarks[`q${q}`] || 10}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+            {/* Evaluation Summary & Comments */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 transform transition-all duration-300 ease-in-out hover:shadow-md">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Evaluation Summary</h3>
 
               <div className="space-y-4">
@@ -480,7 +648,7 @@ const StudentEvaluation = () => {
                   </button>
 
                   <button
-                    onClick={() => navigate(`/teacher/evaluation/${examId}`)}
+                    onClick={() => navigate(`/teacher/evaluation/${subjectId}`)}
                     className="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <FaTimes />
@@ -488,8 +656,6 @@ const StudentEvaluation = () => {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
       </div>
     </div>
   );

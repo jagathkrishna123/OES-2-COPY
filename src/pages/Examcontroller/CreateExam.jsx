@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { addNewExam, getDynamicExams } from "../../constants/constants";
 import { FaPlus, FaTrash, FaUpload, FaFileAlt, FaBook, FaUsers, FaKey, FaRedo } from "react-icons/fa";
+import { fileToBase64 } from "../../utils/fileUtils";
 
 const CreateExam = () => {
   const [loading, setLoading] = useState(false);
@@ -231,10 +232,23 @@ const CreateExam = () => {
     try {
       setLoading(true);
 
+      // Convert files to Base64 for persistent storage
+      const [questionPaperBase64, answerKeyBase64, ...studentAnswerSheetsBase64] = await Promise.all([
+        questionPaper ? fileToBase64(questionPaper) : null,
+        answerKey ? fileToBase64(answerKey) : null,
+        ...students.map(student => student.file ? fileToBase64(student.file) : null)
+      ]);
+
       // For demo purposes, we'll simulate API success and add to local storage
       // In a real application, this would be handled by the backend
       const existingExams = getDynamicExams();
-      const newExamId = `EXAM${String(existingExams.length + 1).padStart(3, '0')}`;
+      // Generate unique ID by finding the highest existing exam number
+      const existingIds = existingExams.map(e => {
+        const match = e.id.match(/^EXAM(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      });
+      const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+      const newExamId = `EXAM${String(nextId).padStart(3, '0')}`;
 
       const newExam = {
         id: newExamId,
@@ -242,15 +256,20 @@ const CreateExam = () => {
         department: exam.department,
         year: exam.year,
         subject: exam.subject,
-        questionPaper: questionPaper?.name || "question_paper.pdf",
-        answerKey: answerKey?.name || "answer_key.pdf",
+        // Store Base64 data instead of File objects
+        questionPaper: questionPaperBase64 || null,
+        questionPaperType: questionPaper?.type || null,
+        answerKey: answerKeyBase64 || null,
+        answerKeyType: answerKey?.type || null,
         createdAt: new Date().toISOString(),
         status: "active",
-        students: students.map(student => ({
+        students: students.map((student, index) => ({
           studentId: student.studentId,
           studentName: allStudents.find(s => s.id === student.studentId)?.studentName || "Unknown",
           rollNo: student.rollNo,
-          answerSheet: student.file?.name || "answer_sheet.pdf",
+          // Store Base64 data instead of File objects
+          answerSheet: studentAnswerSheetsBase64[index] || null,
+          answerSheetType: student.file?.type || null,
           submittedAt: new Date().toISOString(),
           status: "pending"
         }))

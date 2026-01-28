@@ -1,17 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { getDynamicExams } from "../../constants/constants";
+import { getDynamicExams, updateExam } from "../../constants/constants";
 import { useNavigate } from "react-router-dom";
-import { FaBook, FaClock, FaCheckCircle, FaUsers, FaFileAlt } from "react-icons/fa";
+import { FaBook, FaClock, FaCheckCircle, FaUsers, FaFileAlt, FaUser, FaUpload } from "react-icons/fa";
 
 const EvaluateExam = () => {
   const navigate = useNavigate();
   const [examData, setExamData] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [teacher, setTeacher] = useState(null);
+
+  useEffect(() => {
+    // Load teacher information
+    const storedTeacher = JSON.parse(localStorage.getItem("teacher"));
+    if (storedTeacher) {
+      setTeacher(storedTeacher);
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = () => {
       const newData = getDynamicExams();
-      setExamData(newData);
+      // Filter exams by teacher's department, year, and subject
+      const filteredData = teacher
+        ? newData.filter(exam => exam.department === teacher.department && exam.year === teacher.year && exam.subject === teacher.subject)
+        : newData;
+      setExamData(filteredData);
     };
 
     loadData();
@@ -23,7 +36,7 @@ const EvaluateExam = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [teacher]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-blue-50 p-6 font-out">
@@ -31,11 +44,17 @@ const EvaluateExam = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
           <FaFileAlt className="text-blue-600" />
-          Evaluate Exams
+          Evaluate Examsxxxxxxx
         </h1>
         <p className="text-gray-600">
-          Review and evaluate student answer sheets for assigned examinations.
+          Review and evaluate student answer sheets for {teacher ? `${teacher.subject} subject in ${teacher.department} department, ${teacher.year}` : 'assigned'} examinations.
         </p>
+        {teacher && (
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+            <FaUser className="text-blue-600" />
+            {teacher.name} - {teacher.department} ({teacher.year}) - {teacher.subject}
+          </div>
+        )}
       </div>
 
       {/* Exams Grid */}
@@ -45,7 +64,15 @@ const EvaluateExam = () => {
             <div className="text-gray-500">
               <FaFileAlt className="mx-auto h-16 w-16 mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">No Exams Available</h3>
-              <p>Please create exams from the Exam Controller section.</p>
+              <p>
+                {teacher
+                  ? `No exams found for ${teacher.subject} subject in ${teacher.department} department (${teacher.year}). Exams will appear here when created for your specific department, academic year, and subject.`
+                  : 'Please log in as a teacher to view exams.'
+                }
+              </p>
+              {!teacher && (
+                <p className="text-sm text-gray-400 mt-2">Teacher information not found in localStorage.</p>
+              )}
             </div>
           </div>
         ) : (
@@ -70,9 +97,11 @@ const EvaluateExam = () => {
                 <div className={`px-3 py-1 rounded-full text-xs font-medium ${
                   exam.status === "completed"
                     ? "bg-green-100 text-green-700"
+                    : exam.status === "submitted"
+                    ? "bg-yellow-100 text-yellow-700"
                     : "bg-blue-100 text-blue-700"
                 }`}>
-                  {exam.status === "completed" ? "Completed" : "Active"}
+                  {exam.status === "completed" ? "Published" : exam.status === "submitted" ? "Submitted" : "Active"}
                 </div>
               </div>
 
@@ -120,21 +149,46 @@ const EvaluateExam = () => {
               {/* Action Button */}
               <button
                 onClick={() => {
-                  // Force reload of exam data before navigation
-                  const freshData = getDynamicExams();
-                  console.log("EvaluateExam - navigating to exam:", exam.id, "with fresh data:", freshData.length, "exams");
-                  navigate(`/teacher/evaluation/${exam.id}`);
+                  if (percentage === 100 && exam.status !== "submitted" && exam.status !== "completed") {
+                    // Submit results to controller
+                    const updatedExam = { ...exam, status: "submitted", submittedDate: new Date().toISOString() };
+                    updateExam(updatedExam);
+                    alert("Results submitted to exam controller for publishing!");
+                    // Refresh the page to update the UI
+                    window.location.reload();
+                  } else if (exam.status !== "submitted" && exam.status !== "completed") {
+                    // Navigate to evaluation page
+                    const freshData = getDynamicExams();
+                    const currentExam = freshData.find(e => e.id === exam.id);
+                    navigate(`/teacher/evaluation/${exam.id}`, {
+                      state: { examData: currentExam }
+                    });
+                  }
                 }}
                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
                   exam.status === "completed"
                     ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                    : exam.status === "submitted"
+                    ? "bg-yellow-100 text-yellow-700 cursor-not-allowed"
+                    : percentage === 100
+                    ? "bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:from-green-700 hover:to-emerald-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                     : "bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 }`}
               >
                 {exam.status === "completed" ? (
                   <>
                     <FaCheckCircle />
-                    View Results
+                    Results Published
+                  </>
+                ) : exam.status === "submitted" ? (
+                  <>
+                    <FaClock />
+                    Awaiting Publication
+                  </>
+                ) : percentage === 100 ? (
+                  <>
+                    <FaUpload />
+                    Submit Results
                   </>
                 ) : (
                   <>

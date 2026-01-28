@@ -8,6 +8,7 @@ const Login = () => {
   const [messageType, setMessageType] = useState(""); // success, error, info
   const [departments, setDepartments] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [availableYears, setAvailableYears] = useState([]);
 
   // Teacher Login State
   const [teacherLogin, setTeacherLogin] = useState({
@@ -22,6 +23,7 @@ const Login = () => {
     password: "",
     confirmPassword: "",
     department: "",
+    year: "",
     subject: "",
     teacherId: "",
   });
@@ -88,6 +90,7 @@ const Login = () => {
         name: teacher.name,
         email: teacher.email,
         department: teacher.department,
+        year: teacher.year,
         subject: teacher.subject,
       }));
 
@@ -106,7 +109,7 @@ const Login = () => {
 
     // Validation
     if (!teacherSignup.name || !teacherSignup.email || !teacherSignup.password ||
-        !teacherSignup.confirmPassword || !teacherSignup.department || !teacherSignup.subject || !teacherSignup.teacherId) {
+        !teacherSignup.confirmPassword || !teacherSignup.department || !teacherSignup.year || !teacherSignup.subject || !teacherSignup.teacherId) {
       showMessage("❌ Please fill in all required fields.", "error");
       return;
     }
@@ -146,6 +149,7 @@ const Login = () => {
       email: teacherSignup.email,
       password: teacherSignup.password,
       department: teacherSignup.department,
+      year: teacherSignup.year,
       subject: teacherSignup.subject,
       status: "active", // Default status for new teachers
       createdAt: new Date().toISOString(),
@@ -164,6 +168,7 @@ const Login = () => {
       password: "",
       confirmPassword: "",
       department: "",
+      year: "",
       subject: "",
       teacherId: "",
     });
@@ -205,23 +210,34 @@ const Login = () => {
     setDepartments(savedDepartments);
   }, []);
 
-  // Update available subjects when department changes
+  // Update available years when department changes
   useEffect(() => {
     if (teacherSignup.department) {
       const selectedDept = departments.find(dept => dept.name === teacherSignup.department);
       if (selectedDept) {
-        // Collect all subjects from all years for the selected department
-        const allSubjects = Object.values(selectedDept.years).flat();
-        // Remove duplicates
-        const uniqueSubjects = [...new Set(allSubjects)];
-        setAvailableSubjects(uniqueSubjects);
+        const years = Object.keys(selectedDept.years || {});
+        setAvailableYears(years);
+      } else {
+        setAvailableYears([]);
+      }
+    } else {
+      setAvailableYears([]);
+    }
+  }, [teacherSignup.department, departments]);
+
+  // Update available subjects when department and year changes
+  useEffect(() => {
+    if (teacherSignup.department && teacherSignup.year) {
+      const selectedDept = departments.find(dept => dept.name === teacherSignup.department);
+      if (selectedDept && selectedDept.years[teacherSignup.year]) {
+        setAvailableSubjects(selectedDept.years[teacherSignup.year]);
       } else {
         setAvailableSubjects([]);
       }
     } else {
       setAvailableSubjects([]);
     }
-  }, [teacherSignup.department, departments]);
+  }, [teacherSignup.department, teacherSignup.year, departments]);
 
   // Check if already logged in
   useEffect(() => {
@@ -400,30 +416,61 @@ const Login = () => {
                 />
               </div>
 
-              <div>
-                <label htmlFor="signup-department" className="block text-sm font-medium text-gray-700">
-                  Department *
-                </label>
-                <select
-                  id="signup-department"
-                  name="department"
-                  required
-                  value={teacherSignup.department}
-                  onChange={handleTeacherSignupChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">Select Department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.name}>
-                      {dept.name}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="signup-department" className="block text-sm font-medium text-gray-700">
+                    Department *
+                  </label>
+                  <select
+                    id="signup-department"
+                    name="department"
+                    required
+                    value={teacherSignup.department}
+                    onChange={handleTeacherSignupChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                  {departments.length === 0 && (
+                    <p className="mt-1 text-xs text-orange-600">
+                      No departments available. Please contact the controller to create departments.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="signup-year" className="block text-sm font-medium text-gray-700">
+                    Academic Year *
+                  </label>
+                  <select
+                    id="signup-year"
+                    name="year"
+                    required
+                    value={teacherSignup.year}
+                    onChange={handleTeacherSignupChange}
+                    disabled={!teacherSignup.department}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {teacherSignup.department ? "Select Year" : "Select Department First"}
                     </option>
-                  ))}
-                </select>
-                {departments.length === 0 && (
-                  <p className="mt-1 text-xs text-orange-600">
-                    No departments available. Please contact the controller to create departments.
-                  </p>
-                )}
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                  {teacherSignup.department && availableYears.length === 0 && (
+                    <p className="mt-1 text-xs text-orange-600">
+                      No academic years available for this department.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -436,11 +483,11 @@ const Login = () => {
                   required
                   value={teacherSignup.subject}
                   onChange={handleTeacherSignupChange}
-                  disabled={!teacherSignup.department}
+                  disabled={!teacherSignup.department || !teacherSignup.year}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">
-                    {teacherSignup.department ? "Select Subject" : "Select Department First"}
+                    {teacherSignup.department && teacherSignup.year ? "Select Subject" : "Select Department & Year First"}
                   </option>
                   {availableSubjects.map((subject, index) => (
                     <option key={index} value={subject}>
@@ -448,9 +495,9 @@ const Login = () => {
                     </option>
                   ))}
                 </select>
-                {teacherSignup.department && availableSubjects.length === 0 && (
+                {teacherSignup.department && teacherSignup.year && availableSubjects.length === 0 && (
                   <p className="mt-1 text-xs text-orange-600">
-                    No subjects available for this department.
+                    No subjects available for this department and year.
                   </p>
                 )}
               </div>

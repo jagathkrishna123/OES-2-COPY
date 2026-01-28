@@ -1,18 +1,28 @@
 
 
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { getAllExams } from "../../constants/constants";
-import { FaBook, FaUsers, FaCheckCircle, FaClock, FaEye, FaPlay, FaFileAlt } from "react-icons/fa";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
+import { getDynamicExams } from "../../constants/constants";
+import { FaBook, FaUsers, FaCheckCircle, FaClock, FaEye, FaPlay, FaFileAlt, FaArrowLeft } from "react-icons/fa";
 
 const SubjectEvaluation = () => {
   const { subjectId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [examData, setExamData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = () => {
-      setExamData(getAllExams());
+      // Always prioritize exam data from navigation state
+      const examFromState = location.state?.examData;
+      if (examFromState) {
+        setExamData([examFromState]);
+      } else {
+        // Fallback: load all exams and find by subjectId
+        const allExams = getDynamicExams();
+        setExamData(allExams);
+      }
       setLoading(false);
     };
 
@@ -20,7 +30,7 @@ const SubjectEvaluation = () => {
 
     // Reload data periodically to catch newly created exams
     const interval = setInterval(() => {
-      const newData = getAllExams();
+      const newData = getDynamicExams();
       if (newData.length !== examData.length) {
         setExamData(newData);
       }
@@ -70,6 +80,15 @@ const SubjectEvaluation = () => {
 
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => navigate("/teacher/evaluate")}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 text-sm md:text-base hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <FaArrowLeft />
+              Back to Exams
+            </button>
+          </div>
           <div className="flex items-center gap-3 mb-2">
             <FaBook className="text-blue-600" size={32} />
             <div>
@@ -182,7 +201,7 @@ const SubjectEvaluation = () => {
                     <td className="px-6 py-4">
                       <Link
                         to={`/teacher/evaluation/${exam.id}/${student.studentId}`}
-                        state={{ examData: exam }}
+                        state={{ examData: exam, studentData: student }}
                         className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                           student.status === "evaluated"
                             ? "bg-gray-100 text-gray-700 hover:bg-gray-200"

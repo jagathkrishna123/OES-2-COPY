@@ -1,4 +1,4 @@
-import React from "react";
+// import React, { useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import Login from "./components/Login";
@@ -22,9 +22,14 @@ import SubjectEvaluation from "./pages/Teacher/SubjectEvaluation";
 import StudentEvaluation from "./pages/Teacher/StudentEvaluation";
 import ScrollToTop from "./components/ScrollToTop";
 import AllStudents from "./pages/Examcontroller/AllStudents";
+import StudentResults from "./components/StudentResults";
 const App = () => {
   const { pathname } = useLocation();
   const hideLayout = pathname.includes("admin") || pathname.includes("teacher") || pathname.includes("controller");
+  // useEffect(() => {
+  //   localStorage.clear();   // 🔥 clears whole project data
+  // }, []);
+
   return (
     <div>
       <ScrollToTop/>
@@ -33,6 +38,8 @@ const App = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/results" element={<StudentResults />} />
+        <Route path="/results/:studentId" element={<StudentResults />} />
         <Route path="/teacher" element={<TeacherLayout />}>
           <Route index element={<TeacherDashboard />} />
           <Route path="addstudent" element={<AddStudent />} />

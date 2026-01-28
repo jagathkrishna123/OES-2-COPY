@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { getAllExams } from '../../constants/constants'
+import { getDynamicExams } from '../../constants/constants'
 import { 
   FaBook, 
   FaUsers, 
@@ -28,28 +28,43 @@ const ManageResults = () => {
   })
   const [message, setMessage] = useState("")
   const [messageType, setMessageType] = useState("")
+  const [lastExamCount, setLastExamCount] = useState(0)
 
-  // Load exams and published status on mount
+  // Load exams and published status on mount and periodically refresh
   useEffect(() => {
     loadExams()
+
+    // Set up periodic refresh to check for newly submitted results
+    const interval = setInterval(() => {
+      loadExams()
+    }, 3000) // Check every 3 seconds
+
+    return () => clearInterval(interval) // Cleanup on unmount
   }, [])
 
   const loadExams = () => {
-    const allExams = getAllExams()
+    const allExams = getDynamicExams()
     setExams(allExams)
 
-    // Filter exams where all students have been evaluated
-    const completed = allExams.filter(exam => {
+    // Filter exams that are submitted by teachers (ready for controller approval)
+    const submitted = allExams.filter(exam => {
       const students = exam.students || []
       if (students.length === 0) return false
-      return students.every(student => student.status === "evaluated")
+      // Must have all students evaluated AND status should be "submitted"
+      return students.every(student => student.status === "evaluated") && exam.status === "submitted"
     })
+
+    // Check if we have new submitted exams
+    if (submitted.length > lastExamCount && lastExamCount > 0) {
+      showMessage(`📬 New exam results submitted for review! (${submitted.length} total pending)`, "info")
+    }
+    setLastExamCount(submitted.length)
 
     // Load published status from localStorage
     const publishedExams = JSON.parse(localStorage.getItem('publishedResults') || '[]')
-    
-    // Add published status to completed exams
-    const examsWithStatus = completed.map(exam => ({
+
+    // Add published status to submitted exams
+    const examsWithStatus = submitted.map(exam => ({
       ...exam,
       isPublished: publishedExams.includes(exam.id)
     }))
@@ -105,18 +120,35 @@ const ManageResults = () => {
   const handlePublish = (examId) => {
     if (window.confirm("Are you sure you want to publish these results? Once published, results will be visible to students.")) {
       const publishedExams = JSON.parse(localStorage.getItem('publishedResults') || '[]')
-      
+
       if (!publishedExams.includes(examId)) {
+        // Add to published results
         publishedExams.push(examId)
         localStorage.setItem('publishedResults', JSON.stringify(publishedExams))
-        
+
+        // Update the exam status to completed and add published date
+        const allExams = getDynamicExams()
+        const examToUpdate = allExams.find(exam => exam.id === examId)
+        if (examToUpdate) {
+          const updatedExam = {
+            ...examToUpdate,
+            status: "completed",
+            publishedDate: new Date().toISOString()
+          }
+          // Update the exam in localStorage
+          const updatedExams = allExams.map(exam =>
+            exam.id === examId ? updatedExam : exam
+          )
+          localStorage.setItem('dynamicExams', JSON.stringify(updatedExams))
+        }
+
         // Update local state
-        setCompletedExams(prev => 
-          prev.map(exam => 
-            exam.id === examId ? { ...exam, isPublished: true } : exam
+        setCompletedExams(prev =>
+          prev.map(exam =>
+            exam.id === examId ? { ...exam, isPublished: true, status: "completed", publishedDate: new Date().toISOString() } : exam
           )
         )
-        
+
         showMessage("✅ Results published successfully! Students can now view their results.", "success")
       } else {
         showMessage("Results are already published.", "error")
@@ -250,9 +282,19 @@ const ManageResults = () => {
 
         {/* Filters and Search */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaFilter className="text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Filters & Search</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FaFilter className="text-blue-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Filters & Search</h2>
+            </div>
+            <button
+              onClick={() => loadExams()}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              title="Refresh results"
+            >
+              <FaSearch className="text-sm" />
+              Refresh
+            </button>
           </div>
 
           {/* Search Bar */}
